@@ -315,6 +315,7 @@ int main() {
     char  sentence[MAX_SENTENCE] = "";
     char  word[MAX_WORD]         = "";
     char  last_word[MAX_WORD]    = "";
+    char  undone_active_word[MAX_WORD] = "";
     char *translation            = Nil;
     char **thes                  = Nil;
     int   show_thes              = 0;
@@ -339,7 +340,14 @@ int main() {
             int cur_col = PREFIX_LEN + (int)strlen(sentence) + (int)strlen(word);
 
             if (ch2 == 0x4B) {  /* Arrow Left = Undo */
-                if (!IsEmptyStack(undo_stack)) {
+                if (strlen(word) > 0) {
+                    /* Undo kata yang sedang aktif diketik */
+                    strcpy(undone_active_word, word);
+                    word[0] = '\0';
+                    show_thes = 0;
+                    RedrawAll(sentence, word, last_word, translation, thes, show_thes);
+                } else if (!IsEmptyStack(undo_stack)) {
+                    /* Undo kata yang sudah masuk ke stack kalimat */
                     char *undone = PopStr(&undo_stack);
                     Push(&redo_stack, undone);
                     free(undone);
@@ -367,6 +375,7 @@ int main() {
                 }
             } else if (ch2 == 0x4D) {  /* Arrow Right = Redo */
                 if (!IsEmptyStack(redo_stack)) {
+                    /* Redo kata dari stack kalimat */
                     char *redone = PopStr(&redo_stack);
                     Push(&undo_stack, redone);
                     free(redone);
@@ -383,6 +392,12 @@ int main() {
                         FindTop3(kamus, last_word);
                     }
                     if (thes) { FreeStrArray(thes); thes = Nil; }
+                    show_thes = 0;
+                    RedrawAll(sentence, word, last_word, translation, thes, show_thes);
+                } else if (strlen(undone_active_word) > 0) {
+                    /* Redo kata yang sedang aktif diketik */
+                    strcpy(word, undone_active_word);
+                    undone_active_word[0] = '\0';
                     show_thes = 0;
                     RedrawAll(sentence, word, last_word, translation, thes, show_thes);
                 }
@@ -420,6 +435,7 @@ int main() {
                 }
             }
             show_thes = 0;
+            undone_active_word[0] = '\0'; /* Reset redo untuk kata aktif karena ada pengeditan */
             RedrawAll(sentence, word, last_word, translation, thes, show_thes);
             continue;
         }
@@ -452,6 +468,7 @@ int main() {
             Push(&undo_stack, word);
             DestroyStack(&redo_stack);
             CreateEmptyStack(&redo_stack);
+            undone_active_word[0] = '\0'; /* Reset redo untuk kata aktif */
 
             strcpy(last_word, word);
             strcat(sentence, word);
@@ -492,6 +509,7 @@ int main() {
             word[wlen]     = (char)ch;
             word[wlen + 1] = '\0';
             show_thes = 0;
+            undone_active_word[0] = '\0'; /* Reset redo untuk kata aktif karena ada karakter baru */
         }
 
         RedrawAll(sentence, word, last_word, translation, thes, show_thes);
