@@ -1,6 +1,7 @@
 /* File    : teststack.c                                    */
 /* Desk    : Unit Test untuk Struktur Data Stack (stack.h/c)*/
-/* Oleh    : Antigravity                                    */
+/* Oleh    : Muhammad Faqih Shiam (251524023)              */
+/*           Rajbi Muhammad Nizar (251524027)              */
 /* Tgl     : 2026                                           */
 
 #include <stdio.h>

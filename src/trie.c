@@ -1,7 +1,8 @@
 /* File    : trie.c                                         */
 /* Desk    : Implementasi Struktur Data Trie untuk Fitur     */
 /*           Auto-Suggest dan Auto-Complete Kata            */
-/* Oleh    : Antigravity                                    */
+/* Oleh    : Muhammad Faqih Shiam (251524023)  
+             Rajbi Muhammad Nizar (251524027)         */
 /* Tgl     : 2026                                           */
 
 #include <stdlib.h>

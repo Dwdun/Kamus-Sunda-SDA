@@ -1,7 +1,8 @@
 /* File    : stack.h                                        */
 /* Desk    : Deklarasi Struktur Data Stack untuk Fitur Undo  */
 /*           dan Redo Kata pada Aplikasi Nyunda             */
-/* Oleh    : Antigravity                                    */
+/* Oleh    : Muhammad Faqih Shiam (251524023)              */
+/*           Rajbi Muhammad Nizar (251524027)              */
 /* Tgl     : 2026                                           */
 
 #ifndef STACK_H

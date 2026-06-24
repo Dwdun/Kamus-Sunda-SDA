@@ -1,6 +1,7 @@
 /* File    : testtrie.c                                     */
 /* Desk    : Unit Test untuk Struktur Data Trie (trie.h/c)  */
-/* Oleh    : Antigravity                                    */
+/* Oleh    : Muhammad Faqih Shiam (251524023)              */
+/*           Rajbi Muhammad Nizar (251524027)              */
 /* Tgl     : 2026                                           */
 
 #include <stdio.h>

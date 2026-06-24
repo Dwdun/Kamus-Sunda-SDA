@@ -2,7 +2,7 @@
 /* Desk    : Test Unit untuk Utility Functions (utility.h/c) */
 /* Oleh    : Muhammad Faqih Shiam (251524023)              */
 /*           Rajbi Muhammad Nizar (251524027)              */
-/* Tgl     : 2024                                           */
+/* Tgl     : 2026                                           */
 /* Mk      : Struktur Data dan Algoritma                   */
 
 #include <stdio.h>
