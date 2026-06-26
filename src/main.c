@@ -40,7 +40,7 @@ static Trie kamus_trie;
    ============================================================ */
 
 void SetClr(int color) {
-    SetConsoleTextAttribute(hConsole, color);
+    /* No-op: disable terminal coloring */
 }
 
 void GotoXY(int x, int y) {
@@ -131,28 +131,22 @@ void FindTop3(AVLTree tree, char *input) {
    Row 9   : (kosong)
    Row 10  : Hint keys
    ============================================================ */
+#define ROW_HINT    1
 #define ROW_INPUT   3
 #define ROW_TRANS   5
 #define ROW_SINONIM 6
 #define ROW_KOREKSI 7
 #define ROW_SARAN   8
-#define ROW_HINT    10
 #define PREFIX_LEN  4   /* "  > " */
 
 void DrawHeader() {
     system("cls");
-    SetClr(CLR_CYAN);
-    printf("+----------------------------------------------------------+\n");
-    printf("|         NYUNDA  -  Kamus Sunda Interaktif                |\n");
-    printf("+----------------------------------------------------------+\n");
-    SetClr(CLR_NORMAL);
+    printf("=== NYUNDA - Kamus Sunda Interaktif ===\n");
 }
 
 void DrawHint() {
     GotoXY(0, ROW_HINT);
-    SetClr(CLR_GRAY);
-    printf("  SPACE=terjemahan  ?=sinonim  TAB=autocomplete  ESC=keluar");
-    SetClr(CLR_NORMAL);
+    printf("Petunjuk: SPACE = terjemahkan | TAB = autocomplete | ? = sinonim | ESC = keluar");
 }
 
 /* ============================================================
@@ -167,56 +161,35 @@ void RedrawAll(char *sentence, char *word,
 
     /* --- Baris input --- */
     ClearLineAt(ROW_INPUT);
-    SetClr(CLR_GRAY);
-    printf("  > ");
-    SetClr(CLR_NORMAL);
-    printf("%s", sentence);
-    SetClr(CLR_GREEN);
-    printf("%s", word);
-    SetClr(CLR_NORMAL);
+    printf("  > %s%s", sentence, word);
 
     /* --- Terjemahan --- */
     ClearLineAt(ROW_TRANS);
     GotoXY(0, ROW_TRANS);
     if (last_word && strlen(last_word) > 0) {
         if (translation) {
-            SetClr(CLR_YELLOW);
-            printf("  [Terjemahan] ");
-            SetClr(CLR_WHITE);
-            printf("%s", last_word);
-            SetClr(CLR_NORMAL);
-            printf("  ->  ");
-            SetClr(CLR_GREEN);
-            printf("%s", translation);
+            printf("  [Terjemahan] : %s -> %s", last_word, translation);
         } else {
-            SetClr(CLR_RED);
-            printf("  [Terjemahan] '%s' tidak ditemukan dalam kamus.", last_word);
+            printf("  [Terjemahan] : '%s' tidak ditemukan", last_word);
         }
-        SetClr(CLR_NORMAL);
     }
 
     /* --- Sinonim --- */
     ClearLineAt(ROW_SINONIM);
     GotoXY(0, ROW_SINONIM);
     if (show_thes && thes) {
-        SetClr(CLR_CYAN);
-        printf("  [Sinonim   ] ");
-        SetClr(CLR_NORMAL);
+        printf("  Sinonim: ");
         int any = 0;
         for (i = 0; i < MaxSinonim; i++) {
             if (thes[i] != Nil && strlen(thes[i]) > 0) {
-                if (any) { SetClr(CLR_GRAY); printf("  |  "); }
-                SetClr(CLR_WHITE);
+                if (any) printf(", ");
                 printf("%s", thes[i]);
-                SetClr(CLR_NORMAL);
                 any = 1;
             }
         }
         if (!any) {
-            SetClr(CLR_GRAY);
-            printf("(tidak ada sinonim)");
+            printf("(tidak ada)");
         }
-        SetClr(CLR_NORMAL);
     }
 
     /* --- Koreksi top-3 --- */
@@ -228,16 +201,12 @@ void RedrawAll(char *sentence, char *word,
             if (top3[i].word != Nil) { any = 1; break; }
         }
         if (any) {
-            SetClr(CLR_YELLOW);
-            printf("  [Koreksi   ] Maksud kamu: ");
-            SetClr(CLR_NORMAL);
+            printf("  [Maksud Anda] : ");
             int first = 1;
             for (i = 0; i < TOP_N; i++) {
                 if (top3[i].word != Nil) {
-                    if (!first) { SetClr(CLR_GRAY); printf("  |  "); }
-                    SetClr(CLR_WHITE);
+                    if (!first) printf(", ");
                     printf("%s", top3[i].word);
-                    SetClr(CLR_NORMAL);
                     first = 0;
                 }
             }
@@ -248,25 +217,20 @@ void RedrawAll(char *sentence, char *word,
     ClearLineAt(ROW_SARAN);
     GotoXY(0, ROW_SARAN);
     if (strlen(word) >= 1) {
-        SetClr(CLR_CYAN);
-        printf("  [Saran     ] ");
-        
+        printf("  [Saran] : ");
         char *suggestions[3] = {Nil, Nil, Nil};
         int sugg_count = 0;
         GetSuggestions(kamus_trie, word, suggestions, &sugg_count, 3);
         if (sugg_count > 0) {
             int first = 1;
             for (i = 0; i < sugg_count; i++) {
-                if (!first) { SetClr(CLR_GRAY); printf("  |  "); }
-                SetClr(CLR_WHITE);
+                if (!first) printf(", ");
                 printf("%s", suggestions[i]);
                 first = 0;
             }
         } else {
-            SetClr(CLR_GRAY);
-            printf("(tidak ada saran)");
+            printf("(tidak ada)");
         }
-        SetClr(CLR_NORMAL);
     }
 
     /* --- Kembali ke cursor input --- */
@@ -284,9 +248,7 @@ int main() {
     /* Load kamus */
     DrawHeader();
     GotoXY(0, ROW_INPUT);
-    SetClr(CLR_YELLOW);
-    printf("  Memuat kamus, harap tunggu...");
-    SetClr(CLR_NORMAL);
+    printf("  Memuat kamus, silakan tunggu...");
 
     AVLTree kamus;
     CreateEmptyBST(&kamus);
@@ -300,10 +262,8 @@ int main() {
     }
 
     if (!loaded) {
-        SetClr(CLR_RED);
         GotoXY(0, ROW_INPUT);
-        printf("  [ERROR] Gagal memuat data kamus! Pastikan file CSV tersedia.\n");
-        SetClr(CLR_NORMAL);
+        printf("  Error: Gagal memuat data kamus. Pastikan file CSV tersedia.\n");
         return 1;
     }
 
@@ -522,10 +482,8 @@ int main() {
     DestroyStack(&undo_stack);
     DestroyStack(&redo_stack);
 
-    GotoXY(0, ROW_HINT + 2);
-    SetClr(CLR_CYAN);
+    GotoXY(0, ROW_SARAN + 2);
     printf("\n  Sampai jumpa! Hatur nuhun parantos nganggo Nyunda.\n\n");
-    SetClr(CLR_NORMAL);
 
     return 0;
 }
