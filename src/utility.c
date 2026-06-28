@@ -146,37 +146,6 @@ void FindTop3(AVLTree tree, char *input, Candidate *top3) {
     }
 }
 
-static void find_closest_word(AVLTree avl_tree, 
-                               char *misspelled_word,
-                               char **closest_word,
-                               int *min_distance) {
-    if ((avl_tree) == Nil) return;
-    
-    /* Hitung distance untuk node sekarang */
-    int dist = LevenshteinDistance(misspelled_word, Key(avl_tree));
-    
-    /* Jika distance lebih kecil dan masih dalam range, update closest */
-    if (dist < (*min_distance) && dist <= MaxLevenshteinDist) {
-        (*min_distance) = dist;
-        (*closest_word) = Key(avl_tree);
-    }
-    
-    /* Rekursi ke left dan right */
-    find_closest_word(Left(avl_tree),  misspelled_word, closest_word, min_distance);
-    find_closest_word(Right(avl_tree), misspelled_word, closest_word, min_distance);
-}
-
-char* AutoCorrectTypo(AVLTree avl_tree, char *misspelled_word) {
-    if ((avl_tree) == Nil || (misspelled_word) == Nil) return Nil;
-    
-    char *closest_word = Nil;
-    int min_distance = MaxLevenshteinDist + 1;
-    
-    find_closest_word(avl_tree, misspelled_word, &closest_word, &min_distance);
-    
-    return closest_word;
-}
-
 /* ============================================================
    THESAURUS / SINONIM
    ============================================================ */

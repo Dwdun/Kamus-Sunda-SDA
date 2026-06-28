@@ -56,16 +56,6 @@ void ResetTop3(Candidate *top3);
 
 void FindTop3(AVLTree tree, char *input, Candidate *top3);
 
-char* AutoCorrectTypo(AVLTree avl_tree, char *misspelled_word);
-/* Mencari kata terdekat dari misspelled_word menggunakan Levenshtein distance.
-   Hanya mencari kata dengan distance <= MaxLevenshteinDist (3).
-   Return: pointer ke kata terbaik dari AVL-BST, atau Nil jika tidak ada.
-   
-   Strategi: DFS traverse AVL tree + compute distance untuk setiap node.
-   Ambil node dengan distance terkecil.
-   
-   NOTE: Return pointer dari AVL tree (jangan di-free) */
-
 /* ==================== THESAURUS / SINONIM ==================== */
 
 char** GetThesaurus(AVLTree avl_tree, char *word_sunda);
