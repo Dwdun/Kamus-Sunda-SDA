@@ -9,8 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <conio.h>
-#include <windows.h>
 #include "utility.h"
+#include "gui.h"
 #include "bst_avl.h"
 #include "trie.h"
 #include "stack.h"
@@ -19,231 +19,13 @@
 #define DATA_FILE_ALT "../data/data_kamus_sunda.csv"
 #define MAX_WORD      128
 #define MAX_SENTENCE  1024
-#define TOP_N         3
-
-/* ============================================================
-   WARNA CONSOLE
-   ============================================================ */
-#define CLR_NORMAL  (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE)
-#define CLR_WHITE   (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY)
-#define CLR_GREEN   (FOREGROUND_GREEN | FOREGROUND_INTENSITY)
-#define CLR_YELLOW  (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY)
-#define CLR_CYAN    (FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY)
-#define CLR_RED     (FOREGROUND_RED | FOREGROUND_INTENSITY)
-#define CLR_GRAY    (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE)
-
-static HANDLE hConsole;
-static Trie kamus_trie;
-
-/* ============================================================
-   CONSOLE HELPERS
-   ============================================================ */
-
-void SetClr(int color) {
-    /* No-op: disable terminal coloring */
-}
-
-void GotoXY(int x, int y) {
-    COORD pos = {(SHORT)x, (SHORT)y};
-    SetConsoleCursorPosition(hConsole, pos);
-}
-
-int GetConsoleWidth() {
-    CONSOLE_SCREEN_BUFFER_INFO info;
-    GetConsoleScreenBufferInfo(hConsole, &info);
-    return info.dwSize.X;
-}
-
-void ClearLineAt(int y) {
-    int w = GetConsoleWidth();
-    int i;
-    GotoXY(0, y);
-    for (i = 0; i < w - 1; i++) putchar(' ');
-    GotoXY(0, y);
-}
-
-/* ============================================================
-   TOP-3 AUTO-CORRECT HELPER
-   ============================================================ */
-
-typedef struct {
-    char *word;
-    int   dist;
-} Candidate;
-
-static Candidate top3[TOP_N];
-
-static void dfs_top3(AVLTree node, char *input) {
-    int i, worst_idx;
-    if (node == Nil) return;
-
-    int d = LevenshteinDistance(input, node->key);
-
-    /* Cari slot dengan dist paling besar */
-    worst_idx = 0;
-    for (i = 1; i < TOP_N; i++) {
-        if (top3[i].dist > top3[worst_idx].dist) worst_idx = i;
-    }
-
-    /* Ganti jika lebih baik dan dalam batas */
-    if (d <= MaxLevenshteinDist && d < top3[worst_idx].dist) {
-        top3[worst_idx].word = node->key;
-        top3[worst_idx].dist = d;
-    }
-
-    dfs_top3(node->left, input);
-    dfs_top3(node->right, input);
-}
-
-void ResetTop3() {
-    int i;
-    for (i = 0; i < TOP_N; i++) {
-        top3[i].word = Nil;
-        top3[i].dist = MaxLevenshteinDist + 1;
-    }
-}
-
-void FindTop3(AVLTree tree, char *input) {
-    ResetTop3();
-    dfs_top3(tree, input);
-    /* Sort ascending by dist */
-    int i, j;
-    for (i = 0; i < TOP_N - 1; i++) {
-        for (j = i + 1; j < TOP_N; j++) {
-            if (top3[j].dist < top3[i].dist) {
-                Candidate tmp = top3[i];
-                top3[i] = top3[j];
-                top3[j] = tmp;
-            }
-        }
-    }
-}
-
-/* ============================================================
-   LAYOUT
-   Row 0-2 : Header
-   Row 3   : Input line  "  >> ..."
-   Row 4   : (kosong)
-   Row 5   : [Terjemahan]
-   Row 6   : [Sinonim   ]
-   Row 7   : [Koreksi   ]
-   Row 8   : [Saran     ]
-   Row 9   : (kosong)
-   Row 10  : Hint keys
-   ============================================================ */
-#define ROW_HINT    1
-#define ROW_INPUT   3
-#define ROW_TRANS   5
-#define ROW_SINONIM 6
-#define ROW_KOREKSI 7
-#define ROW_SARAN   8
-#define PREFIX_LEN  4   /* "  > " */
-
-void DrawHeader() {
-    system("cls");
-    printf("=== NYUNDA - Kamus Sunda Interaktif ===\n");
-}
-
-void DrawHint() {
-    GotoXY(0, ROW_HINT);
-    printf("Petunjuk: SPACE = terjemahkan | TAB = autocomplete | ? = sinonim | ESC = keluar");
-}
-
-/* ============================================================
-   REDRAW SELURUH AREA STATUS
-   ============================================================ */
-
-void RedrawAll(char *sentence, char *word,
-               char *last_word, char *translation,
-               char **thes, int show_thes) {
-
-    int i;
-
-    /* --- Baris input --- */
-    ClearLineAt(ROW_INPUT);
-    printf("  > %s%s", sentence, word);
-
-    /* --- Terjemahan --- */
-    ClearLineAt(ROW_TRANS);
-    GotoXY(0, ROW_TRANS);
-    if (last_word && strlen(last_word) > 0) {
-        if (translation) {
-            printf("  [Terjemahan] : %s -> %s", last_word, translation);
-        } else {
-            printf("  [Terjemahan] : '%s' tidak ditemukan", last_word);
-        }
-    }
-
-    /* --- Sinonim --- */
-    ClearLineAt(ROW_SINONIM);
-    GotoXY(0, ROW_SINONIM);
-    if (show_thes && thes) {
-        printf("  Sinonim: ");
-        int any = 0;
-        for (i = 0; i < MaxSinonim; i++) {
-            if (thes[i] != Nil && strlen(thes[i]) > 0) {
-                if (any) printf(", ");
-                printf("%s", thes[i]);
-                any = 1;
-            }
-        }
-        if (!any) {
-            printf("(tidak ada)");
-        }
-    }
-
-    /* --- Koreksi top-3 --- */
-    ClearLineAt(ROW_KOREKSI);
-    GotoXY(0, ROW_KOREKSI);
-    if (last_word && strlen(last_word) > 0 && translation == Nil) {
-        int any = 0;
-        for (i = 0; i < TOP_N; i++) {
-            if (top3[i].word != Nil) { any = 1; break; }
-        }
-        if (any) {
-            printf("  [Maksud Anda] : ");
-            int first = 1;
-            for (i = 0; i < TOP_N; i++) {
-                if (top3[i].word != Nil) {
-                    if (!first) printf(", ");
-                    printf("%s", top3[i].word);
-                    first = 0;
-                }
-            }
-        }
-    }
-
-    /* --- Saran auto-suggest (Trie) --- */
-    ClearLineAt(ROW_SARAN);
-    GotoXY(0, ROW_SARAN);
-    if (strlen(word) >= 1) {
-        printf("  [Saran] : ");
-        char *suggestions[3] = {Nil, Nil, Nil};
-        int sugg_count = 0;
-        GetSuggestions(kamus_trie, word, suggestions, &sugg_count, 3);
-        if (sugg_count > 0) {
-            int first = 1;
-            for (i = 0; i < sugg_count; i++) {
-                if (!first) printf(", ");
-                printf("%s", suggestions[i]);
-                first = 0;
-            }
-        } else {
-            printf("(tidak ada)");
-        }
-    }
-
-    /* --- Kembali ke cursor input --- */
-    int cur_col = PREFIX_LEN + (int)strlen(sentence) + (int)strlen(word);
-    GotoXY(cur_col, ROW_INPUT);
-}
 
 /* ============================================================
    MAIN
    ============================================================ */
 
 int main() {
-    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    InitConsole();
 
     /* Load kamus */
     DrawHeader();
@@ -256,6 +38,7 @@ int main() {
     boolean loaded = LoadKamusSunda(&kamus, DATA_FILE);
     if (!loaded) loaded = LoadKamusSunda(&kamus, DATA_FILE_ALT);
 
+    Trie kamus_trie;
     CreateEmptyTrie(&kamus_trie);
     if (loaded) {
         BuildTrieFromAVL(kamus_trie, kamus);
@@ -269,7 +52,9 @@ int main() {
 
     DrawHeader();
     DrawHint();
-    ResetTop3();
+    
+    Candidate top3[TOP_N];
+    ResetTop3(top3);
 
     /* State */
     char  sentence[MAX_SENTENCE] = "";
@@ -285,7 +70,7 @@ int main() {
     CreateEmptyStack(&undo_stack);
     CreateEmptyStack(&redo_stack);
 
-    RedrawAll(sentence, word, last_word, translation, thes, show_thes);
+    RedrawAll(sentence, word, last_word, translation, thes, show_thes, kamus_trie, top3);
 
     /* Flush sisa input dari terminal (misal Enter yang terbaca dari command) */
     while (_kbhit()) _getch();
@@ -297,15 +82,14 @@ int main() {
         /* Special key (arrow keys, F-keys) */
         if (ch == 0 || ch == 0xE0) {
             int ch2 = _getch();
-            int cur_col = PREFIX_LEN + (int)strlen(sentence) + (int)strlen(word);
-
+            
             if (ch2 == 0x4B) {  /* Arrow Left = Undo */
                 if (strlen(word) > 0) {
                     /* Undo kata yang sedang aktif diketik */
                     strcpy(undone_active_word, word);
                     word[0] = '\0';
                     show_thes = 0;
-                    RedrawAll(sentence, word, last_word, translation, thes, show_thes);
+                    RedrawAll(sentence, word, last_word, translation, thes, show_thes, kamus_trie, top3);
                 } else if (!IsEmptyStack(undo_stack)) {
                     /* Undo kata yang sudah masuk ke stack kalimat */
                     char *undone = PopStr(&undo_stack);
@@ -319,19 +103,19 @@ int main() {
                         addressAVL found = SearchBST(kamus, last_word);
                         if (found != Nil) {
                             translation = found->terjemahan_id;
-                            ResetTop3();
+                            ResetTop3(top3);
                         } else {
                             translation = Nil;
-                            FindTop3(kamus, last_word);
+                            FindTop3(kamus, last_word, top3);
                         }
                     } else {
                         last_word[0] = '\0';
                         translation = Nil;
-                        ResetTop3();
+                        ResetTop3(top3);
                     }
                     if (thes) { FreeStrArray(thes); thes = Nil; }
                     show_thes = 0;
-                    RedrawAll(sentence, word, last_word, translation, thes, show_thes);
+                    RedrawAll(sentence, word, last_word, translation, thes, show_thes, kamus_trie, top3);
                 }
             } else if (ch2 == 0x4D) {  /* Arrow Right = Redo */
                 if (!IsEmptyStack(redo_stack)) {
@@ -346,20 +130,20 @@ int main() {
                     addressAVL found = SearchBST(kamus, last_word);
                     if (found != Nil) {
                         translation = found->terjemahan_id;
-                        ResetTop3();
+                        ResetTop3(top3);
                     } else {
                         translation = Nil;
-                        FindTop3(kamus, last_word);
+                        FindTop3(kamus, last_word, top3);
                     }
                     if (thes) { FreeStrArray(thes); thes = Nil; }
                     show_thes = 0;
-                    RedrawAll(sentence, word, last_word, translation, thes, show_thes);
+                    RedrawAll(sentence, word, last_word, translation, thes, show_thes, kamus_trie, top3);
                 } else if (strlen(undone_active_word) > 0) {
                     /* Redo kata yang sedang aktif diketik */
                     strcpy(word, undone_active_word);
                     undone_active_word[0] = '\0';
                     show_thes = 0;
-                    RedrawAll(sentence, word, last_word, translation, thes, show_thes);
+                    RedrawAll(sentence, word, last_word, translation, thes, show_thes, kamus_trie, top3);
                 }
             }
             continue;
@@ -396,20 +180,39 @@ int main() {
             }
             show_thes = 0;
             undone_active_word[0] = '\0'; /* Reset redo untuk kata aktif karena ada pengeditan */
-            RedrawAll(sentence, word, last_word, translation, thes, show_thes);
+            RedrawAll(sentence, word, last_word, translation, thes, show_thes, kamus_trie, top3);
             continue;
         }
 
-        /* TAB = autocomplete */
+        /* TAB = state-aware autocomplete/correction */
         if (ch == 9) {
-            if (strlen(word) >= 1) {
+            /* State 1: Auto-correct is active, replace with top suggestion */
+            if (translation == Nil && strlen(last_word) > 0 && top3[0].word != Nil) {
+                char *old_word = PopStr(&undo_stack);
+                free(old_word);
+                
+                Push(&undo_stack, top3[0].word);
+                strcpy(last_word, top3[0].word);
+                ReconstructSentence(undo_stack, sentence);
+
+                addressAVL found = SearchBST(kamus, last_word);
+                if (found != Nil) {
+                    translation = found->terjemahan_id;
+                }
+                /* ResetTop3 happens automatically on the next search/find */
+                ResetTop3(top3); 
+                show_thes = 0;
+                RedrawAll(sentence, word, last_word, translation, thes, show_thes, kamus_trie, top3);
+            }
+            /* State 2: Default autocomplete for current word */
+            else if (strlen(word) >= 1) {
                 char *suggestions[1] = {Nil};
                 int count = 0;
                 GetSuggestions(kamus_trie, word, suggestions, &count, 1);
                 if (count > 0) {
                     strcpy(word, suggestions[0]);
                     show_thes = 0;
-                    RedrawAll(sentence, word, last_word, translation, thes, show_thes);
+                    RedrawAll(sentence, word, last_word, translation, thes, show_thes, kamus_trie, top3);
                 }
             }
             continue;
@@ -441,13 +244,13 @@ int main() {
             addressAVL found = SearchBST(kamus, last_word);
             if (found != Nil) {
                 translation = found->terjemahan_id;
-                ResetTop3();
+                ResetTop3(top3);
             } else {
                 translation = Nil;
-                FindTop3(kamus, last_word);
+                FindTop3(kamus, last_word, top3);
             }
 
-            RedrawAll(sentence, word, last_word, translation, thes, show_thes);
+            RedrawAll(sentence, word, last_word, translation, thes, show_thes, kamus_trie, top3);
             continue;
         }
 
@@ -459,7 +262,7 @@ int main() {
                 thes = GetThesaurus(kamus, target);
                 show_thes = 1;
             }
-            RedrawAll(sentence, word, last_word, translation, thes, show_thes);
+            RedrawAll(sentence, word, last_word, translation, thes, show_thes, kamus_trie, top3);
             continue;
         }
 
@@ -472,7 +275,7 @@ int main() {
             undone_active_word[0] = '\0'; /* Reset redo untuk kata aktif karena ada karakter baru */
         }
 
-        RedrawAll(sentence, word, last_word, translation, thes, show_thes);
+        RedrawAll(sentence, word, last_word, translation, thes, show_thes, kamus_trie, top3);
     }
 
     /* Cleanup */

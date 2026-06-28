@@ -7,6 +7,34 @@
 
 #include "utility.h"
 
+static HANDLE hConsole;
+
+/* ============================================================
+   CONSOLE HELPERS
+   ============================================================ */
+
+void InitConsole() {
+    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+}
+
+void GotoXY(int x, int y) {
+    COORD pos = {(SHORT)x, (SHORT)y};
+    SetConsoleCursorPosition(hConsole, pos);
+}
+
+int GetConsoleWidth() {
+    CONSOLE_SCREEN_BUFFER_INFO info;
+    GetConsoleScreenBufferInfo(hConsole, &info);
+    return info.dwSize.X;
+}
+
+void ClearLineAt(int y) {
+    int w = GetConsoleWidth();
+    int i;
+    GotoXY(0, y);
+    for (i = 0; i < w - 1; i++) putchar(' ');
+    GotoXY(0, y);
+}
 
 
 void FreeStrArray(char **arr) {
@@ -71,6 +99,52 @@ int LevenshteinDistance(char *s1, char *s2) {
 /* ============================================================
    AUTO-CORRECT TYPO
    ============================================================ */
+
+static void dfs_top3(AVLTree node, char *input, Candidate *top3) {
+    int i, worst_idx;
+    if (node == Nil) return;
+
+    int d = LevenshteinDistance(input, node->key);
+
+    /* Cari slot dengan dist paling besar */
+    worst_idx = 0;
+    for (i = 1; i < TOP_N; i++) {
+        if (top3[i].dist > top3[worst_idx].dist) worst_idx = i;
+    }
+
+    /* Ganti jika lebih baik dan dalam batas */
+    if (d <= MaxLevenshteinDist && d < top3[worst_idx].dist) {
+        top3[worst_idx].word = node->key;
+        top3[worst_idx].dist = d;
+    }
+
+    dfs_top3(node->left, input, top3);
+    dfs_top3(node->right, input, top3);
+}
+
+void ResetTop3(Candidate *top3) {
+    int i;
+    for (i = 0; i < TOP_N; i++) {
+        top3[i].word = Nil;
+        top3[i].dist = MaxLevenshteinDist + 1;
+    }
+}
+
+void FindTop3(AVLTree tree, char *input, Candidate *top3) {
+    ResetTop3(top3);
+    dfs_top3(tree, input, top3);
+    /* Sort ascending by dist */
+    int i, j;
+    for (i = 0; i < TOP_N - 1; i++) {
+        for (j = i + 1; j < TOP_N; j++) {
+            if (top3[j].dist < top3[i].dist) {
+                Candidate tmp = top3[i];
+                top3[i] = top3[j];
+                top3[j] = tmp;
+            }
+        }
+    }
+}
 
 static void find_closest_word(AVLTree avl_tree, 
                                char *misspelled_word,
