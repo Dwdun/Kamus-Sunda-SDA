@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <windows.h>
 #include "boolean.h"
 #include "bst_avl.h"
 
@@ -19,6 +20,16 @@
 
 #define Nil                 NULL
 #define MaxLevenshteinDist  3
+#define TOP_N               3
+
+/* ============================================================
+   CONSOLE HELPERS
+   ============================================================ */
+void InitConsole();
+void GotoXY(int x, int y);
+int GetConsoleWidth();
+void ClearLineAt(int y);
+
 
 /* ==================== UTILITY FUNCTIONS ==================== */
 
@@ -35,6 +46,15 @@ int LevenshteinDistance(char *s1, char *s2);
    Kompleksitas: O(len1 * len2) */
 
 /* ==================== AUTO-CORRECT TYPO ==================== */
+
+typedef struct {
+    char *word;
+    int   dist;
+} Candidate;
+
+void ResetTop3(Candidate *top3);
+
+void FindTop3(AVLTree tree, char *input, Candidate *top3);
 
 char* AutoCorrectTypo(AVLTree avl_tree, char *misspelled_word);
 /* Mencari kata terdekat dari misspelled_word menggunakan Levenshtein distance.
